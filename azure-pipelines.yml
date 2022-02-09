@@ -1,0 +1,220 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+  branches:
+    include:
+    - feature/*
+    - develop
+    - master
+    exclude:
+    - 'refs/tags/*'
+pr:
+- develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+name: $(Date:yyyyMMdd)$(Rev:rr)
+
+variables:
+- name: jdkVersion
+  value: '1.8'  
+#- name: referencePipelineFeed
+#  value: 'referencePipelineFeed'   
+- name: orgPrefix
+  value: 'tulasi' 
+- name: developBranch
+  value: 'refs/heads/develop'
+- name: develop
+  value: 'develop'
+- name: mainBranch
+  value: 'master' 
+#- name: mavenServiceConnections
+#  value: 'anypoint-exchange, avio-mule-ee-releases, avio-releases, mulesoft-releases'  
+- name: anypointUsername
+  value: 'guest_account3' 
+- name: anypointPassword
+  value: 'B0bby@123' 
+- name: anypointBusinessGroup
+  value: 'Guest'
+- name: workerType
+  value: 'MICRO'
+- name: email
+  value: 'tchakrapani@avioconsulting.com' 
+- name: username
+  value: 'tchakrapani'
+- name: MAVEN_CACHE_FOLDER
+  value: $(Pipeline.Workspace)/.m2/repository
+- name: MAVEN_COMMON_OPTIONS
+  value: '-e -B -Dmaven.repo.local=$(MAVEN_CACHE_FOLDER) -U'  
+- name: MAVEN_OPTIONS_WITH_SETTINGS
+  value: '-e -B -Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)'
+- name: MAVEN_QUIET_DEPENDENCY_FETCHING
+  value: '-Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn'
+- name: MAVEN_BUILD_OPTS
+  value: '$(MAVEN_OPTIONS_WITH_SETTINGS) $(MAVEN_QUIET_DEPENDENCY_FETCHING) -DskipTests'
+- name: MAVEN_BUILD_DEPLOY_OPTS
+  value: '$(MAVEN_OPTIONS_WITH_SETTINGS) $(MAVEN_QUIET_DEPENDENCY_FETCHING)'
+   
+
+stages:
+
+- stage: Build_Stage
+  displayName: Build and Publish
+  condition: always()
+  jobs:
+  - job: Build_and_Publish
+    steps: 
+    - task: MavenAuthenticate@0
+      displayName: 'Get Feed Credentials'  
+      inputs:
+#        artifactsFeeds: '$(referencePipelineFeed)'
+#        MavenServiceConnections: 'anypoint-exchange, avio-mule-ee-releases, avio-releases, mulesoft-releases'
+    - task: Maven@3
+      displayName: 'Set Version'
+      condition: eq(variables['Build.SourceBranch'], variables['developBranch'])
+      inputs:
+        goals: 'build-helper:parse-version versions:set -DnewVersion=${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}-$(Build.BuildNumber) -DprocessAllModules versions:commit'
+        options: $(MAVEN_OPTIONS_WITH_SETTINGS)
+        jdkVersionOption: $(jdkVersion) 
+    - task: PowerShell@2
+      displayName: 'Init: Parse POM for GAV'
+      condition: eq(variables['Build.SourceBranch'], variables['developBranch'])
+      inputs:
+        workingDirectory: $(System.DefaultWorkingDirectory)
+        targetType: inline
+        script: |
+                  $project = ([xml](Get-Content -Path pom.xml)).project
+                  $appArtifactId = $project.artifactId
+                  $appGroupId = $project.groupId
+                  $appVersion = $project.version
+                  echo "##vso[build.updatebuildnumber]$appVersion"
+                  echo "##vso[task.setvariable variable=appVersion;isOutput=true]$appVersion"
+                  echo "##vso[task.setvariable variable=appArtifactId;isOutput=true]$appArtifactId"
+                  echo "##vso[task.setvariable variable=appGroupId;isOutput=true]$appGroupId"
+      name: ValidateVar                  
+    - task: Maven@3
+      displayName: 'Verify'
+      inputs:
+        goals: 'verify'
+        options: $(MAVEN_BUILD_DEPLOY_OPTS)
+        publishJUnitResults: true
+        jdkVersionOption: $(jdkVersion) 
+    - task: CopyFiles@2
+      displayName: 'Store Artifact: Copy Jar to: $(build.artifactstagingdirectory)'
+      condition: eq(variables['Build.SourceBranch'], variables['developBranch'])
+      inputs:
+        SourceFolder: '$(system.defaultworkingdirectory)'
+        Contents: '**/target/*.jar'
+        TargetFolder: '$(build.artifactstagingdirectory)'
+    - task: CopyFiles@2
+      displayName: 'Store Artifact: Copy Pom to: $(build.artifactstagingdirectory)'
+      condition: eq(variables['Build.SourceBranch'], variables['developBranch'])
+      inputs:
+        SourceFolder: '$(system.defaultworkingdirectory)'
+        Contents: 'pom.xml'
+        TargetFolder: '$(build.artifactstagingdirectory)'    
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact: drop'
+      condition: eq(variables['Build.SourceBranch'], variables['developBranch'])
+    # - task: Maven@3
+    #   displayName: 'Publish Artifact to Repository'
+    #   condition: eq(variables['Build.SourceBranch'], variables['developBranch'])
+    #   inputs:
+    #             goals: 'deploy'
+    #             options: $(MAVEN_BUILD_OPTS) 
+    #             jdkVersionOption: $(jdkVersion) 
+
+# Stage for Deploying your application
+- stage: Release_Stage_Sandbox
+  displayName: Deploy to Sandbox
+  dependsOn: 
+  - Build_Stage
+  condition: eq(variables['Build.SourceBranch'], variables['developBranch'])
+  jobs:
+  - job: Deploy_to_Sandbox
+  - template: azure-pipeline-deploy.yml
+    parameters:
+      environment: Sandbox
+      appArtifactId: $[ stageDependencies.Build_Stage.Build_and_Publish.outputs['ValidateVar.appArtifactId'] ]
+      appVersion: $[ stageDependencies.Build_Stage.Build_and_Publish.outputs['ValidateVar.appVersion'] ]
+      appGroupId: $[ stageDependencies.Build_Stage.Build_and_Publish.outputs['ValidateVar.appGroupId'] ]
+ 
+# Stage for Deploying your application to QA
+- stage: Release_Stage_QA
+  displayName: Deploy to QA
+  dependsOn: 
+  - Build_Stage
+  - Release_Stage_Sandbox
+  condition: in(dependencies.Release_Stage_Sandbox.result, 'Succeeded', 'SucceededWithIssues')  
+  jobs:
+  - job: Deploy_to_QA
+  - template: azure-pipeline-deploy.yml
+    parameters:
+      environment: QA
+      appArtifactId: $[ stageDependencies.Build_Stage.Build_and_Publish.outputs['ValidateVar.appArtifactId'] ]
+      appVersion: $[ stageDependencies.Build_Stage.Build_and_Publish.outputs['ValidateVar.appVersion'] ]
+      appGroupId: $[ stageDependencies.Build_Stage.Build_and_Publish.outputs['ValidateVar.appGroupId'] ]
+
+# Stage for Deploying your application to PROD
+- stage: Release_Stage_PROD
+  displayName: Deploy to PROD
+  dependsOn: 
+  - Build_Stage
+  - Release_Stage_QA
+  condition: in(dependencies.Release_Stage_QA.result, 'Succeeded', 'SucceededWithIssues')
+  jobs:
+  - job: Deploy_to_PROD
+  - template: azure-pipeline-deploy.yml
+    parameters:
+      environment: PROD
+      appArtifactId: $[ stageDependencies.Build_Stage.Build_and_Publish.outputs['ValidateVar.appArtifactId'] ]
+      appVersion: $[ stageDependencies.Build_Stage.Build_and_Publish.outputs['ValidateVar.appVersion'] ]
+      appGroupId: $[ stageDependencies.Build_Stage.Build_and_Publish.outputs['ValidateVar.appGroupId'] ]
+ 
+- stage:
+  displayName: Release
+  dependsOn: 
+  - Build_Stage
+  - Release_Stage_PROD
+  condition: in(dependencies.Release_Stage_PROD.result, 'Succeeded')
+  variables:
+    appVersion: $[ stageDependencies.Build_Stage.Build_and_Publish.outputs['ValidateVar.appVersion'] ]
+  jobs:
+  - job: Release
+    steps:
+    - checkout: self
+      persistCredentials: true
+    - task: DownloadSecureFile@1
+      name: mavenSettings #
+      displayName: 'Tag and Merge'
+      inputs:
+        secureFile: mavenSettings.xml   
+    - bash: |  
+            git config --global user.email $(email)
+            git config --global user.name $(username)         
+            echo "checkout $(mainBranch)" 
+            git checkout $(mainBranch)
+            echo "merge $(develop)"
+            git merge origin/$(develop) -X theirs
+            echo "Creating tag v$(appVersion)-$(appVersion) "
+            git tag -a "v$(appVersion)" -m "Version $(appVersion)"
+            echo "pushing tag "
+            git push origin HEAD:$(mainBranch) "v$(appVersion)"           
+      displayName: Create Tag 
+    - task: Maven@3
+      displayName: 'Increment Version'
+      inputs:
+        goals: 'build-helper:parse-version versions:set -DnewVersion=${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion} -DprocessAllModules versions:commit'
+        options: $(MAVEN_OPTIONS_WITH_SETTINGS)
+        jdkVersionOption: $(jdkVersion) 
+    - bash: |  
+            find . -name 'pom.xml' | xargs git add
+            echo "Commiting "
+            git commit -m "Incrementing to next patch version [skip ci]"
+            echo "Push pom "
+            git push origin HEAD:$(mainBranch)
+      displayName: Commit and Push 

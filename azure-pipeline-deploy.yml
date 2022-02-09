@@ -1,0 +1,43 @@
+jobs:
+  - deployment: Deploy
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: ${{ parameters.environment }}
+    variables:
+      appArtifactId: ${{ parameters.appArtifactId }}
+      appGroupId: ${{ parameters.appGroupId }}
+      appVersion: ${{ parameters.appVersion }}
+      environment: ${{ parameters.environment }}      
+    strategy:
+      runOnce:
+        deploy:
+              steps:
+                - task: MavenAuthenticate@0
+                  displayName: 'Initi: Authenticate setup'
+                  inputs:
+#                    artifactsFeeds: 'referencePipelineFeed'
+#                    MavenServiceConnections: 'anypoint-exchange, avio-mule-ee-releases, avio-releases, mulesoft-releases'  
+                - task: PowerShell@2
+                  displayName: 'Update Build Number'
+                  inputs:
+                    targetType: inline
+                    script: |                       
+                       echo "##vso[build.updatebuildnumber]$(appVersion)_$(environment)"
+                - task: CopyFiles@2
+                  displayName: 'Retrieve Artifact: Copy Jar to: $(build.artifactstagingdirectory)'
+                  inputs:
+                    SourceFolder: '$(Pipeline.Workspace)/drop/target'
+                    Contents: '*.jar'
+                    TargetFolder: '$(System.DefaultWorkingDirectory)'
+                - task: CopyFiles@2
+                  displayName: 'Retrieve Artifact: Copy Pom to: $(build.artifactstagingdirectory)'
+                  inputs:
+                    SourceFolder: '$(Pipeline.Workspace)/drop'
+                    Contents: 'pom.xml'
+                    TargetFolder: '$(System.DefaultWorkingDirectory)' 
+                - task: Maven@3
+                  displayName: 'Deploy'
+                  inputs:
+                    workingDirectory: $(System.DefaultWorkingDirectory)/
+                    goals: '-Denvironment=$(environment) -DapplicationName=$(orgPrefix)-$(appArtifactId)-$(environment) -DworkerType=$(workerType) -Dcloudhub.username=$(anypointUsername) -Danypoint.businessGroup="$(businessGroup)"-Dcloudhub.password=$(anypointPassword) -Dmule.artifact=$(appArtifactId)-$(appVersion)-mule-application.jar mule:deploy '
+                    options: $(MAVEN_COMMON_OPTIONS) 

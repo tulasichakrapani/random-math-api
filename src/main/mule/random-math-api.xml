@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config"
+		doc:name="HTTP Listener config"
+		doc:id="0d7bf4ba-51b5-4670-bc19-422be7d6493f">
+		<http:listener-connection host="0.0.0.0"
+			port="${http.port}" />
+	</http:listener-config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="427050b3-78df-4f4b-a241-325420f55778" >
+		<http:request-connection host="numbersapi.com" />
+	</http:request-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="14230afd-0154-4689-8b73-a0248b464ae6" file="common.properties" />
+	<flow name="random-math-apiFlow" doc:id="b551c993-69f6-412a-8dcd-b3ee410e20e6" >
+		<http:listener doc:name="Listener" doc:id="39d77892-39f3-486d-976c-c6e834267d31" config-ref="HTTP_Listener_config" path="/api/*"/>
+		<http:request method="GET" doc:name="Random Math" doc:id="25127fe5-94ea-492b-be5b-ecee882772ae" config-ref="HTTP_Request_configuration" path="/random/math"/>
+		<ee:transform doc:name="Transform Message" doc:id="1daf883a-8945-4305-8346-1828dd870274" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
