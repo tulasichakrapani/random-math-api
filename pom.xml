@@ -35,6 +35,7 @@
 					<cloudHubDeployment>
 						<uri>https://anypoint.mulesoft.com</uri>
 						<muleVersion>${mule.version}</muleVersion>
+						<server>my.anypoint.credentials</server>
 						<!-- Deploy User Parameter -->
 						<username>${cloudhub.username}</username>
 						<password>${cloudhub.password}</password>

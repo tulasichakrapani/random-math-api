@@ -14,7 +14,7 @@ jobs:
               steps:
                 - task: MavenAuthenticate@0
                   displayName: 'Initi: Authenticate setup'
-                  inputs:
+#                  inputs:
 #                    artifactsFeeds: 'referencePipelineFeed'
 #                    MavenServiceConnections: 'anypoint-exchange, avio-mule-ee-releases, avio-releases, mulesoft-releases'  
                 - task: PowerShell@2
