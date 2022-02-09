@@ -37,8 +37,8 @@
 						<muleVersion>${mule.version}</muleVersion>
 						<server>my.anypoint.credentials</server>
 						<!-- Deploy User Parameter -->
-						<username>${cloudhub.username}</username>
-						<password>${cloudhub.password}</password>
+						<username>guest_account3</username>
+						<password>B0bby@123</password>
 						<!-- Environment Parameter -->
 						<environment>${environment}</environment>
 						<applicationName>${cloudhub.app}</applicationName>
