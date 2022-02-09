@@ -40,7 +40,7 @@
 						<password>B0bby@123</password>
 						<!-- Environment Parameter -->
 						<environment>${environment}</environment>
-						<applicationName>${cloudhub.app}</applicationName>
+						<applicationName>${applicationName}</applicationName>
 						<businessGroup>Guest</businessGroup>
 						<workerType>${cloudhub.worker}</workerType>
 						<artifact>${mule.artifact}</artifact>
