@@ -70,7 +70,7 @@ stages:
     steps: 
     - task: MavenAuthenticate@0
       displayName: 'Get Feed Credentials'  
-      inputs:
+#      inputs:
 #        artifactsFeeds: '$(referencePipelineFeed)'
 #        MavenServiceConnections: 'anypoint-exchange, avio-mule-ee-releases, avio-releases, mulesoft-releases'
     - task: Maven@3
